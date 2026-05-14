@@ -76,43 +76,31 @@ else:
     trade_freq = 0.0
     st.error("⏸️ BOT PAUSED")
 
-# ====================== FORECASTER ======================
-def get_forecaster_data(watchlist):
-    forecasts = []
-    for t in watchlist:
-        try:
-            yf_ticker = t.replace("/", "-")
-            df = yf.download(yf_ticker, period="5d", interval="60m", progress=False)
-            if df.empty: continue
-            current_price = float(df['Close'].iloc[-1])
-            ma = float(df['Close'].rolling(20).mean().iloc[-1])
-            diff = (current_price - ma) / ma
-            sentiment_score = random.randint(65, 95)
+# ====================== SAFE PRICE EXTRACTION (Bulletproof) ======================
+def safe_get_price(ticker):
+    try:
+        yf_ticker = ticker.replace("/", "-")
+        df = yf.download(yf_ticker, period="1d", interval="1m", progress=False)
+        if df.empty:
+            return None
             
-            if diff < -0.02:
-                bias = "🔥 STRONGLY BULLISH"
-                signal = "BUY"
-                proj_price = current_price * 1.06
-            elif diff > 0.02:
-                bias = "🧊 STRONGLY BEARISH"
-                signal = "SELL"
-                proj_price = current_price * 0.95
+        # Handle both normal and MultiIndex columns
+        if isinstance(df.columns, pd.MultiIndex):
+            # Try to get the correct column
+            if ('Close', yf_ticker) in df.columns:
+                close_series = df[('Close', yf_ticker)]
             else:
-                bias = "⚖️ NEUTRAL"
-                signal = "HOLD"
-                proj_price = current_price
-                
-            forecasts.append({
-                "Ticker": t,
-                "Current Price": f"${current_price:,.2f}",
-                "Market Bias": bias,
-                "Target": f"${proj_price:,.2f}",
-                "Confidence": f"{sentiment_score}%",
-                "Action": signal
-            })
-        except:
-            continue
-    return forecasts
+                close_series = df['Close']
+        else:
+            close_series = df['Close']
+            
+        # Ensure we have a scalar value
+        price = close_series.iloc[-1]
+        if isinstance(price, pd.Series):
+            price = price.iloc[0] if not price.empty else None
+        return float(price)
+    except:
+        return None
 
 # ====================== TRADE CYCLE ======================
 def run_trade_cycle():
@@ -120,31 +108,30 @@ def run_trade_cycle():
     t = random.choice(tickers)
     status_placeholder.write(f"🔍 Analyzing {t}...")
     try:
-        yf_ticker = t.replace("/", "-")
-        df = yf.download(yf_ticker, period="1d", interval="1m", progress=False)
-        if not df.empty:
-            price = float(df['Close'].iloc[-1])
+        price = safe_get_price(t)
+        if price is None:
+            return False
             
-            acc = trade_client.get_account()
-            buying_power = float(acc.non_marginable_buying_power)
-            qty = (buying_power * risk_per_trade) / price
-            
-            symbol = t.replace("/", "") if "/" not in t else t
-            qty = int(qty) if "/" not in t else round(qty, 4)
-            
-            if qty > 0:
-                order = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, time_in_force=TimeInForce.GTC)
-                trade_client.submit_order(order)
-                if 'trades' not in st.session_state:
-                    st.session_state.trades = []
-                st.session_state.trades.append({
-                    "Time": datetime.now().strftime("%H:%M:%S"),
-                    "Asset": symbol,
-                    "Price": f"${price:,.2f}",
-                    "Size": qty,
-                    "Strategy": strategy
-                })
-                return True
+        acc = trade_client.get_account()
+        buying_power = float(acc.non_marginable_buying_power)
+        qty = (buying_power * risk_per_trade) / price
+        
+        symbol = t.replace("/", "") if "/" not in t else t
+        qty = int(qty) if "/" not in t else round(qty, 4)
+        
+        if qty > 0:
+            order = MarketOrderRequest(symbol=symbol, qty=qty, side=OrderSide.BUY, time_in_force=TimeInForce.GTC)
+            trade_client.submit_order(order)
+            if 'trades' not in st.session_state:
+                st.session_state.trades = []
+            st.session_state.trades.append({
+                "Time": datetime.now().strftime("%H:%M:%S"),
+                "Asset": symbol,
+                "Price": f"${price:,.2f}",
+                "Size": qty,
+                "Strategy": strategy
+            })
+            return True
     except Exception as e:
         st.sidebar.error(f"Trade Error: {e}")
     return False
