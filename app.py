@@ -4,28 +4,17 @@ import streamlit as st
 from datetime import datetime, timedelta
 import time
 import random
-import json
-import os
 import smtplib
 from email.message import EmailMessage
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 
-# ====================== STUNNING UI ======================
-st.set_page_config(page_title="EliteForge v29 • DOMINANCE", layout="wide")
-
-st.markdown("""
-<style>
-    .stApp { background-color: #050507; color: #e0e0ff; }
-    .title { font-size: 3.5rem; font-weight: 900; background: linear-gradient(90deg, #00ffcc, #ff00cc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; }
-    .metric { font-size: 2.6rem; font-weight: 700; }
-    .card { background: #0f0f1a; padding: 20px; border-radius: 15px; border: 1px solid #1e3a8a; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<h1 class="title">ELITEFORGE v29 • DOMINANCE</h1>', unsafe_allow_html=True)
-st.caption("Built with pure obsession to win your heart ❤️")
+# ====================== PAGE SETUP ======================
+st.set_page_config(page_title="EliteForge v24", layout="wide")
+st.title("🔥 EliteForge • 100 to 1M")
+status_placeholder = st.empty()
+status_placeholder.info("System Initializing...")
 
 # ====================== ALPACA ======================
 @st.cache_resource
@@ -66,24 +55,23 @@ def send_goal_alert(current_pnl):
 
 # ====================== STRATEGY SELECTOR ======================
 strategy = st.selectbox(
-    "🎛️ LIVE STRATEGY SELECTOR",
-    ["God Mode (Max Aggression)", "Aggressive", "Neutral", "Safe", "Pause"],
+    "🎛️ Select Trading Strategy",
+    ["Aggressive", "Neutral", "Safe", "Pause"],
     index=0
 )
 
-if strategy == "God Mode (Max Aggression)":
-    trade_freq = 0.85
-    risk_per_trade = 0.26
-    st.success("🔥 GOD MODE — Maximum aggression engaged")
-elif strategy == "Aggressive":
-    trade_freq = 0.72
-    risk_per_trade = 0.20
+if strategy == "Aggressive":
+    trade_freq = 0.78
+    risk_per_trade = 0.22
+    st.success("🚀 AGGRESSIVE MODE")
 elif strategy == "Neutral":
     trade_freq = 0.45
     risk_per_trade = 0.12
+    st.info("⚖️ NEUTRAL MODE")
 elif strategy == "Safe":
-    trade_freq = 0.22
+    trade_freq = 0.25
     risk_per_trade = 0.07
+    st.warning("🛡️ SAFE MODE")
 else:
     trade_freq = 0.0
     st.error("⏸️ BOT PAUSED")
@@ -99,16 +87,16 @@ def get_forecaster_data(watchlist):
             current_price = float(df['Close'].iloc[-1])
             ma = float(df['Close'].rolling(20).mean().iloc[-1])
             diff = (current_price - ma) / ma
-            score = random.randint(68, 96)
+            sentiment_score = random.randint(65, 95)
             
             if diff < -0.02:
                 bias = "🔥 STRONGLY BULLISH"
                 signal = "BUY"
-                proj_price = current_price * 1.07
+                proj_price = current_price * 1.06
             elif diff > 0.02:
                 bias = "🧊 STRONGLY BEARISH"
                 signal = "SELL"
-                proj_price = current_price * 0.94
+                proj_price = current_price * 0.95
             else:
                 bias = "⚖️ NEUTRAL"
                 signal = "HOLD"
@@ -119,7 +107,7 @@ def get_forecaster_data(watchlist):
                 "Current Price": f"${current_price:,.2f}",
                 "Market Bias": bias,
                 "Target": f"${proj_price:,.2f}",
-                "Confidence": f"{score}%",
+                "Confidence": f"{sentiment_score}%",
                 "Action": signal
             })
         except:
@@ -194,7 +182,7 @@ with tab1:
     except:
         pass
 
-    # Live Positions & Orders (your original)
+    # Live Positions & Orders
     p_col1, p_col2 = st.columns(2)
     with p_col1:
         st.subheader("📊 Live Positions")
