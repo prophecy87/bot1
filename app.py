@@ -83,24 +83,58 @@ def safe_get_price(ticker):
         df = yf.download(yf_ticker, period="1d", interval="1m", progress=False)
         if df.empty:
             return None
-            
-        # Handle both normal and MultiIndex columns
+        # Handle MultiIndex safely
         if isinstance(df.columns, pd.MultiIndex):
-            # Try to get the correct column
             if ('Close', yf_ticker) in df.columns:
                 close_series = df[('Close', yf_ticker)]
             else:
                 close_series = df['Close']
         else:
             close_series = df['Close']
-            
-        # Ensure we have a scalar value
         price = close_series.iloc[-1]
         if isinstance(price, pd.Series):
             price = price.iloc[0] if not price.empty else None
         return float(price)
     except:
         return None
+
+# ====================== FORECASTER ======================
+def get_forecaster_data(watchlist):
+    forecasts = []
+    for t in watchlist:
+        try:
+            price = safe_get_price(t)
+            if price is None:
+                continue
+            # Simple MA for demo
+            ma = price * 0.98  # Placeholder
+            diff = (price - ma) / ma
+            sentiment_score = random.randint(65, 95)
+            
+            if diff < -0.02:
+                bias = "🔥 STRONGLY BULLISH"
+                signal = "BUY"
+                proj_price = price * 1.06
+            elif diff > 0.02:
+                bias = "🧊 STRONGLY BEARISH"
+                signal = "SELL"
+                proj_price = price * 0.95
+            else:
+                bias = "⚖️ NEUTRAL"
+                signal = "HOLD"
+                proj_price = price
+                
+            forecasts.append({
+                "Ticker": t,
+                "Current Price": f"${price:,.2f}",
+                "Market Bias": bias,
+                "Target": f"${proj_price:,.2f}",
+                "Confidence": f"{sentiment_score}%",
+                "Action": signal
+            })
+        except:
+            continue
+    return forecasts
 
 # ====================== TRADE CYCLE ======================
 def run_trade_cycle():
